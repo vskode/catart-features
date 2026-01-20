@@ -147,3 +147,7 @@ if __name__ == "__main__":
  
     df_indices.to_csv(output_file, index=False)
     print(f"Indices saved to {output_file}")
+
+def get_acoustic_indices(path):
+    #TODO:lorenzo processing
+    return # dctionary with {'indices_name' : array}
