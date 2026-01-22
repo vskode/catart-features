@@ -1,43 +1,17 @@
-
-
-
-#%%
 import pandas as pd
 import os
 import time
 import numpy as np
-
 from tqdm import tqdm                          
-from concurrent import futures                  # >>>  recomended multi cpu claude
-
+from concurrent import futures                 
 from maad import sound, features
 import multiprocessing as mp
 
-#%%
-
-# -------------------------------------------
-S = -35         # sensitivity
-G = 26 + 16     # gain
-
-#%%
-# Function executed independently on each CPU
-# --------------------------------------------
 def single_file_processing(audio_path, window_s=3):
-    """
-    Process one audio file and compute ecoacoustic indices on fixed time windows.
 
-    Parameters
-    ----------
-    audio_path : str
-        Path to wav file
-    window_s : float
-        Window duration in seconds
+    S = -35         # sensitivity
+    G = 26 + 16     # gain    
 
-    Returns
-    -------
-    df_indices : pandas.DataFrame
-        Indices for all windows of the file
-    """
     try:
         # Load audio
         wave, fs = sound.load(
@@ -98,7 +72,7 @@ def single_file_processing(audio_path, window_s=3):
             # >>> MODIFIED (same merge strategy as GitHub)
             df_row = pd.concat([df_audio_ind, df_spec_ind], axis=1)
             df_row.insert(0, 'file', audio_path)
-            df_row.insert(1, 'start', start_s)
+            df_row.insert(1, 'start (ms)', start_s * 1000)
 
             rows.append(df_row)
 
@@ -108,32 +82,22 @@ def single_file_processing(audio_path, window_s=3):
         print(f"Error processing {audio_path}: {e}")
         return pd.DataFrame()
 
-#%%
-# Main MULTI-CPU execution
-# ------------------------
-if __name__ == "__main__":
 
-    # >>> ADDED (mandatory for multiprocessing safety)
+def get_acoustic_indices(path):
     if mp.get_start_method(allow_none=True) is None:
         mp.set_start_method("fork")
 
-    input_folder = "/home/lorenzo-dubois/Documents/Thèse/Sonosylva_sample/data_sample/Bois_Lavigne/Bois_Lavigne_04_2024"
-    output_file = "/home/lorenzo-dubois/Documents/Thèse/tools/catart_prep/indices_ecoacoustiques.csv"
-
-    #  to have a list of ;wav in the arboresence
     audio_files = [
-        os.path.join(input_folder, f)
-        for f in os.listdir(input_folder)   # glob ? 
+        os.path.join(path, f)
+        for f in os.listdir(path)
         if f.endswith(".wav")
     ]
-
-    nb_cpu = os.cpu_count() -2      # more if need           
-
+    
+    nb_cpu = os.cpu_count() - 2
     df_indices = pd.DataFrame()
 
     tic = time.perf_counter()
 
-    # >>> ADDED (pure multi-CPU processing)
     with tqdm(total=len(audio_files), desc="multi cpu indices calculation...") as pbar:
         with futures.ProcessPoolExecutor(max_workers=nb_cpu) as pool:
             for df_tmp in pool.map(single_file_processing, audio_files):
@@ -141,13 +105,16 @@ if __name__ == "__main__":
                 pbar.update(1)
 
     toc = time.perf_counter()
-
     print(f"Elapsed time (multi CPU): {toc - tic:.1f} s")
 
- 
-    df_indices.to_csv(output_file, index=False)
-    print(f"Indices saved to {output_file}")
-
-def get_acoustic_indices(path):
-    #TODO:lorenzo processing
-    return # dctionary with {'indices_name' : array}
+    # Select only ecoacoustic indices needed for Catart : scikit-maad.github.io/
+    selected_columns = [
+        'file', 'start (ms)', 'ZCR', 'MFC',
+        'LFC', 'AGI', 'nROI', 'LEQt', 'LEQf', 
+        'SNRf', 'SNRt', 'BGNf', 'BGNt', 'HFC'
+    ]
+    
+    df_indices = df_indices[selected_columns]
+    result_dict = {col: df_indices[col].values for col in df_indices.columns}
+    df_indices = result_dict
+    return df_indices
