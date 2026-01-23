@@ -11,10 +11,10 @@ from audio_prep import get_acoustic_indices, CATART_AUDIO_LENGTH, SELECTED_COLUM
 from librosa import get_duration
 
 MODELS = ['birdnet', 'perch_bird', 'beats', 'naturebeats']
-data_dir = '/media/siriussound/Extreme SSD/Recordings/terrestrial/Birds/Lorenzo/Bois_Lavigne_04_2024'
+DATA_DIR = '/media/siriussound/Extreme SSD/Recordings/terrestrial/Birds/Lorenzo/Bois_Lavigne_04_2024'
 
 def get_bacpipe_features():
-    bacpipe.config.audio_dir = Path(data_dir)
+    bacpipe.config.audio_dir = Path(DATA_DIR)
     bacpipe.config.models = MODELS
     bacpipe.config.dashboard = False
     bacpipe.settings.run_pretrained_classifier = False
