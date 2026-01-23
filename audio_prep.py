@@ -7,7 +7,17 @@ from concurrent import futures
 from maad import sound, features
 import multiprocessing as mp
 
-def single_file_processing(audio_path, window_s=3):
+
+CATART_AUDIO_LENGTH = 3
+
+# Select only ecoacoustic indices needed for Catart : scikit-maad.github.io/
+SELECTED_COLUMNS = [
+    'ZCR', 'MFC',
+    'LFC', 'AGI', 'nROI', 'LEQt', 'LEQf', 
+    'SNRf', 'SNRt', 'BGNf', 'BGNt', 'HFC'
+]
+
+def single_file_processing(audio_path):
 
     S = -35         # sensitivity
     G = 26 + 16     # gain    
@@ -24,14 +34,14 @@ def single_file_processing(audio_path, window_s=3):
         
         total_samples = len(wave)
         duration_s = total_samples / fs
-        n_windows = int(np.ceil(duration_s / window_s)) # >>>>> ceil ? claude
+        n_windows = int(duration_s // CATART_AUDIO_LENGTH)
 
         rows = []
 
         for i in range(n_windows):
-            start_s = i * window_s
+            start_s = i * CATART_AUDIO_LENGTH
             start_sample = int(start_s * fs)
-            end_sample = int(min((start_s + window_s) * fs, total_samples))
+            end_sample = int(min((start_s + CATART_AUDIO_LENGTH) * fs, total_samples))
 
             if start_sample >= total_samples:
                 break
@@ -84,6 +94,7 @@ def single_file_processing(audio_path, window_s=3):
 
 
 def get_acoustic_indices(path):
+    
     if mp.get_start_method(allow_none=True) is None:
         mp.set_start_method("fork")
 
@@ -106,15 +117,7 @@ def get_acoustic_indices(path):
 
     toc = time.perf_counter()
     print(f"Elapsed time (multi CPU): {toc - tic:.1f} s")
-
-    # Select only ecoacoustic indices needed for Catart : scikit-maad.github.io/
-    selected_columns = [
-        'file', 'start (ms)', 'ZCR', 'MFC',
-        'LFC', 'AGI', 'nROI', 'LEQt', 'LEQf', 
-        'SNRf', 'SNRt', 'BGNf', 'BGNt', 'HFC'
-    ]
     
-    df_indices = df_indices[selected_columns]
     result_dict = {col: df_indices[col].values for col in df_indices.columns}
     df_indices = result_dict
     return df_indices
