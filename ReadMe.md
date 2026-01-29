@@ -1,4 +1,4 @@
-# CatArt Features — README
+# CataRT Features — README
 
 Quick instructions to set up a Python 3.11 virtual environment, install required packages, and configure the two main project files: `audio_prep.py` and `generate_catart_files.py`.
 

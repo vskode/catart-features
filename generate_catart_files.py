@@ -10,10 +10,8 @@ import json
 from audio_prep import get_acoustic_indices, CATART_AUDIO_LENGTH, SELECTED_COLUMNS
 from librosa import get_duration
 
-MODELS = ['birdnet', 'perch_bird', 'beats', 'naturebeats']
-DATA_DIR = '/media/siriussound/Extreme SSD/Recordings/terrestrial/Birds/Lorenzo/Bois_Lavigne_04_2024'
-
-def get_bacpipe_features():
+def get_bacpipe_features(MODELS, DATA_DIR):
+    
     bacpipe.config.audio_dir = Path(DATA_DIR)
     bacpipe.config.models = MODELS
     bacpipe.config.dashboard = False
@@ -104,9 +102,9 @@ def get_umap_2d(embeds):
 
     duration = annotations['end'] - annotations['start']
 
-    df['file_names'] = annotations['audiofilename']
-    df['starts'] = annotations['start'].astype(int) * 1000
-    df['duration'] = duration.astype(int) * 1000
+    df['Filename'] = annotations['audiofilename']
+    df['start'] = annotations['start'].astype(int) * 1000
+    df['Duration'] = duration.astype(int) * 1000
     
     for model in embeds.keys():
         df[f'{model}1'] = x[model]
@@ -117,14 +115,4 @@ def get_umap_2d(embeds):
 def concatenate_features(df_bacpipe, indices):
     df_indices = pd.DataFrame({k: v for k, v in indices.items() if k in SELECTED_COLUMNS})
     df = pd.concat([df_bacpipe, df_indices], axis=1)
-    df.to_csv('catart_features.txt', index=False)
-
-bacpipe_features, audio_path = get_bacpipe_features()
-
-
-indices = get_acoustic_indices(audio_path)
-
-        
-df_features = get_umap_2d(bacpipe_features)
-
-concatenate_features(df_features, indices)
+    df.to_csv('catart_features.txt', index=False, separator=' ')
