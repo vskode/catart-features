@@ -30,7 +30,7 @@ def get_bacpipe_features(MODELS, DATA_DIR):
 
     umap_embeddings = {}
     for model in ld.keys():
-        file_path = list(ld[model].paths.dim_reduc_parent_dir.iterdir())[0]
+        file_path = list(ld[model].paths.dim_reduc_parent_dir.rglob(f'*{model}'))[0]
         with open(list(file_path.rglob('*.json'))[0], 'r') as f:
             umap_embeddings[model] = json.load(f)
     return umap_embeddings, str(ld[model].audio_dir)
