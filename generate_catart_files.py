@@ -11,7 +11,7 @@ from audio_prep import get_acoustic_indices, CATART_AUDIO_LENGTH, SELECTED_COLUM
 from librosa import get_duration
 
 def get_bacpipe_features(MODELS, DATA_DIR):
-    
+    bacpipe.settings.main_results_dir = Path('G:\Work\Embeddings')
     bacpipe.config.audio_dir = Path(DATA_DIR)
     bacpipe.config.models = MODELS
     bacpipe.config.dashboard = False
@@ -33,7 +33,9 @@ def get_bacpipe_features(MODELS, DATA_DIR):
         file_path = list(ld[model].paths.dim_reduc_parent_dir.rglob(f'*{model}'))[0]
         with open(list(file_path.rglob('*.json'))[0], 'r') as f:
             umap_embeddings[model] = json.load(f)
-    return umap_embeddings, str(ld[model].audio_dir)
+            
+    audio_file_paths = [Path(DATA_DIR) / f for f in ld[model].metadata_dict['files']['audio_files']]
+    return umap_embeddings, audio_file_paths
 
 
 def make_annotations_for_bacpipe_inputs():
@@ -60,7 +62,7 @@ def make_annotations_for_bacpipe_inputs():
     segments_per_file = [
         # we decided to discard the last segment that is under
         # CATART_AUDIO_LENGTH seconds long
-        l // CATART_AUDIO_LENGTH
+        l // CATART_AUDIO_LENGTH + 1
         for l in lengths
     ]
     starts = []
@@ -84,35 +86,36 @@ def make_annotations_for_bacpipe_inputs():
     catart_grid['end'] = catart_grid['start'] + CATART_AUDIO_LENGTH
     catart_grid['audiofilename'] = file_array_same_length_as_starts
     catart_grid['label:speices'] = [None] * len(catart_grid)
-    catart_grid.to_csv(ld.audio_dir / 'annotations.csv')
+    catart_grid.to_csv(ld.audio_dir / 'catart_timestamp_annotations.csv')
 
-def get_umap_2d(embeds):
+def get_umap_2d(data_dir, embeds):
     df = pd.DataFrame()
     x, y = {}, {}
     for model, embed in embeds.items():
         x[model] = embed['x']
         y[model] = embed['y']
 
-    first_model = list(embeds.values())[0]
-
-
     annotations = pd.read_csv(
-        Path(first_model['metadata']['audio_dir']) / 'annotations.csv'
+        Path(data_dir) / 'catart_timestamp_annotations.csv'
         )
 
     duration = annotations['end'] - annotations['start']
 
-    df['Filename'] = annotations['audiofilename']
+    df['Filename'] = [str(Path(f).as_posix()) for f in annotations['audiofilename']]
     df['start'] = annotations['start'].astype(int) * 1000
     df['Duration'] = duration.astype(int) * 1000
     
     for model in embeds.keys():
+        if not len(x[model]) == len(annotations):
+            print("length of embeddings and annotations don't match")
+            x[model] = x[model][:len(annotations)]
+            y[model] = y[model][:len(annotations)]
         df[f'{model}1'] = x[model]
         df[f'{model}2'] = y[model]
 
     return df
 
-def concatenate_features(df_bacpipe, indices):
+def concatenate_features(data_dir, df_bacpipe, indices):
     df_indices = pd.DataFrame({k: v for k, v in indices.items() if k in SELECTED_COLUMNS})
     df = pd.concat([df_bacpipe, df_indices], axis=1)
-    df.to_csv('catart_features.txt', index=False, separator=' ')
+    df.to_csv(Path(data_dir) / 'catart_features.txt', index=False, sep=' ')

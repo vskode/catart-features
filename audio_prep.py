@@ -93,27 +93,26 @@ def single_file_processing(audio_path):
         return pd.DataFrame()
 
 
-def get_acoustic_indices(path):
+def get_acoustic_indices(audio_files):
     
-    if mp.get_start_method(allow_none=True) is None:
-        mp.set_start_method("fork")
-
-    audio_files = [
-        os.path.join(path, f)
-        for f in os.listdir(path)
-        if f.endswith(".wav")
-    ]
+    # if mp.get_start_method(allow_none=True) is None:
+    #     mp.set_start_method("spawn")
     
-    nb_cpu = os.cpu_count() - 2
+    # nb_cpu = os.cpu_count() - 2
     df_indices = pd.DataFrame()
 
     tic = time.perf_counter()
 
+    # with tqdm(total=len(audio_files), desc="multi cpu indices calculation...") as pbar:
+    #     with futures.ProcessPoolExecutor(max_workers=nb_cpu) as pool:
+    #         for df_tmp in pool.map(single_file_processing, audio_files):
+    #             df_indices = pd.concat([df_indices, df_tmp])
+    #             pbar.update(1)
     with tqdm(total=len(audio_files), desc="multi cpu indices calculation...") as pbar:
-        with futures.ProcessPoolExecutor(max_workers=nb_cpu) as pool:
-            for df_tmp in pool.map(single_file_processing, audio_files):
-                df_indices = pd.concat([df_indices, df_tmp])
-                pbar.update(1)
+        for file in audio_files:
+            df_tmp = single_file_processing(file)
+            df_indices = pd.concat([df_indices, df_tmp])
+            pbar.update(1)
 
     toc = time.perf_counter()
     print(f"Elapsed time (multi CPU): {toc - tic:.1f} s")
@@ -121,3 +120,27 @@ def get_acoustic_indices(path):
     result_dict = {col: df_indices[col].values for col in df_indices.columns}
     df_indices = result_dict
     return df_indices
+
+
+# def get_acoustic_indices(audio_files):
+#     # Remove the set_start_method line from here
+#     nb_cpu = os.cpu_count() - 2
+    
+#     # Use a list to collect DataFrames (MUCH faster than pd.concat in a loop)
+#     all_dfs = []
+
+#     with tqdm(total=len(audio_files), desc="multi cpu indices calculation...") as pbar:
+#         with futures.ProcessPoolExecutor(max_workers=nb_cpu) as pool:
+#             # map returns an iterator, we collect it
+#             for df_tmp in pool.map(single_file_processing, audio_files):
+#                 if not df_tmp.empty:
+#                     all_dfs.append(df_tmp)
+#                 pbar.update(1)
+
+#     if all_dfs:
+#         df_indices = pd.concat(all_dfs, ignore_index=True)
+#     else:
+#         df_indices = pd.DataFrame()
+
+#     # Convert to dict as per your requirements
+#     return {col: df_indices[col].values for col in df_indices.columns}
