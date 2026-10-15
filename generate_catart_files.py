@@ -7,12 +7,12 @@ import pandas as pd
 import numpy as np
 import json
 
-from audio_prep import get_acoustic_indices, CATART_AUDIO_LENGTH, SELECTED_COLUMNS
+from audio_prep import get_acoustic_indices, SELECTED_COLUMNS
 from librosa import get_duration
 
-def get_bacpipe_features(audio_dir, models=None, device='cuda'):
+def get_bacpipe_features(audio_dir, model_for_time_grid, models=None, device='cuda'):
     
-    df = make_annotations_for_bacpipe_inputs(audio_dir)
+    df = make_annotations_for_bacpipe_inputs(audio_dir, model_for_time_grid)
     
     loader = dict()
     umaps = {}
@@ -46,7 +46,7 @@ def get_bacpipe_features(audio_dir, models=None, device='cuda'):
     return umaps, audio_dir, loader
 
 
-def make_annotations_for_bacpipe_inputs(audio_dir):
+def make_annotations_for_bacpipe_inputs(audio_dir, model_for_time_grid):
     """
     Build an annotations.csv file which can then be used as an input
     for bacpipe. This way all deep learning models create embeddings
@@ -55,7 +55,7 @@ def make_annotations_for_bacpipe_inputs(audio_dir):
     input length, the audio is minimum padded to correspond to the
     required model input length. 
     """
-    df_ml = bacpipe.metadata_labels(audio_dir, model='birdnet', as_type='dataframe', overwrite=False)
+    df_ml = bacpipe.metadata_labels(audio_dir, model=model_for_time_grid, as_type='dataframe', overwrite=False)
     
     catart_grid = df_ml[['start', 'end', 'audio_file_name']].copy()
     catart_grid = catart_grid.rename(columns={'audio_file_name': 'audiofilename'})

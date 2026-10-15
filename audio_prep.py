@@ -11,7 +11,7 @@ import librosa as lb
 import warnings
 from pathlib import Path
 
-CATART_AUDIO_LENGTH = 3
+# CATART_AUDIO_LENGTH = 3
 
 # Select only ecoacoustic indices needed for Catart : scikit-maad.github.io/
 SELECTED_COLUMNS = [
@@ -20,7 +20,7 @@ SELECTED_COLUMNS = [
     'SNRf', 'SNRt', 'BGNf', 'BGNt', 'HFC'
 ]
 
-def single_file_processing(audio_path, sr, nr_embeds_per_file):
+def single_file_processing(audio_path, sr, nr_embeds_per_file, model_input_length):
 
     S = -35         # sensitivity
     G = 26 + 16     # gain    
@@ -37,9 +37,9 @@ def single_file_processing(audio_path, sr, nr_embeds_per_file):
             rows = []
 
             for i in range(n_windows):
-                start_s = i * CATART_AUDIO_LENGTH
+                start_s = i * model_input_length
                 start_sample = int(start_s * fs)
-                end_sample = int(min((start_s + CATART_AUDIO_LENGTH) * fs, total_samples))
+                end_sample = int(min((start_s + model_input_length) * fs, total_samples))
                 if start_sample >= total_samples:
                     break
 
@@ -96,7 +96,7 @@ def single_file_processing(audio_path, sr, nr_embeds_per_file):
         return pd.DataFrame()
 
 
-def get_acoustic_indices(DATA_DIR, loader):
+def get_acoustic_indices(DATA_DIR, loader, model_input_length):
     
     audio_files = [
         Path(DATA_DIR) 
@@ -122,14 +122,15 @@ def get_acoustic_indices(DATA_DIR, loader):
                     single_file_processing, 
                     audio_files, 
                     [sr]*len(audio_files),
-                    nr_embeds_per_file
+                    nr_embeds_per_file,
+                    [model_input_length]*len(audio_files)
                     ):
                     df_indices = pd.concat([df_indices, df_tmp])
                     pbar.update(1)
     else: # it does not on windows
         with tqdm(total=len(audio_files), desc="processing files with single process") as pbar:
             for file in audio_files:
-                df_tmp = single_file_processing(file, sr, nr_embeds_per_file)
+                df_tmp = single_file_processing(file, sr, nr_embeds_per_file, model_input_length)
                 df_indices = pd.concat([df_indices, df_tmp])
                 pbar.update(1)
 
