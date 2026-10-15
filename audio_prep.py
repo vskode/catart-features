@@ -24,17 +24,13 @@ def single_file_processing(audio_path, sr, nr_embeds_per_file):
 
     S = -35         # sensitivity
     G = 26 + 16     # gain    
-
     try:
-
         with warnings.catch_warnings(action="ignore"):
             wave, fs = lb.load(
                 audio_path,
-                mono=False,
+                mono=True,
                 sr=sr
             )
-
-            
             total_samples = len(wave)
             n_windows = nr_embeds_per_file
 
@@ -44,7 +40,6 @@ def single_file_processing(audio_path, sr, nr_embeds_per_file):
                 start_s = i * CATART_AUDIO_LENGTH
                 start_sample = int(start_s * fs)
                 end_sample = int(min((start_s + CATART_AUDIO_LENGTH) * fs, total_samples))
-
                 if start_sample >= total_samples:
                     break
 
@@ -61,7 +56,6 @@ def single_file_processing(audio_path, sr, nr_embeds_per_file):
                     rejectDuration=0.01,
                     verbose=False
                 )
-
                 # === Spectral indices ===
                 Sxx_power, tn, fn, ext = sound.spectrogram(
                     segment, fs,
@@ -70,7 +64,6 @@ def single_file_processing(audio_path, sr, nr_embeds_per_file):
                     noverlap=1024 // 2,
                     verbose=False
                 )
-
                 df_spec_ind, _ = features.all_spectral_alpha_indices(
                     Sxx_power, tn, fn,
                     flim_low=[0, 1500],
@@ -90,12 +83,10 @@ def single_file_processing(audio_path, sr, nr_embeds_per_file):
                     fig.colorbar(img, ax=ax, format='%+2.0f dB')
                     ax.set(title='Mel-frequency spectrogram')
                     fig.savefig('test.png')
-
-                # >>> MODIFIED (same merge strategy as GitHub)
+                    # >>> MODIFIED (same merge strategy as GitHub)
                 df_row = pd.concat([df_audio_ind, df_spec_ind], axis=1)
                 df_row.insert(0, 'file', audio_path)
                 df_row.insert(1, 'start (ms)', start_s * 1000)
-
                 rows.append(df_row)
 
             return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()

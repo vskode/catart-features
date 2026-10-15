@@ -1,0 +1,2 @@
+bacpipe==1.3.5
+scikit-maad==1.5.2

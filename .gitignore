@@ -1,4 +1,6 @@
 data/
-bacpipe/
-bacpipe_results/
+bacpipe_model_checkpoints
+*results*
+*.txt
 .vscode
+!requirements.txt

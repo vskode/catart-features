@@ -10,44 +10,43 @@ import json
 from audio_prep import get_acoustic_indices, CATART_AUDIO_LENGTH, SELECTED_COLUMNS
 from librosa import get_duration
 
-def get_bacpipe_features(DATA_DIR, models=None):
-    # bacpipe.settings.main_results_dir = Path('G:\Work\Embeddings')
-    bacpipe.settings.main_results_dir = Path('/mnt/swap/Work/Embeddings/catart')
-    bacpipe.config.audio_dir = Path(DATA_DIR)
-    if models:
-        bacpipe.config.models = models
-    else:
-        bacpipe.config.already_computed = True
-    bacpipe.config.dashboard = False
-    bacpipe.settings.run_pretrained_classifier = False
-    bacpipe.settings.device = 'cuda'
+def get_bacpipe_features(audio_dir, models=None, device='cuda'):
     
-    bacpipe.settings.only_embed_annotations = True
+    df = make_annotations_for_bacpipe_inputs(audio_dir)
     
-    df = make_annotations_for_bacpipe_inputs()
+    loader = dict()
+    umaps = {}
+    for model in models:
+        
+        loader = bacpipe.generate_embeddings(
+            model_name=model, 
+            audio_dir=audio_dir, 
+            annotations_df=df,
+            dim_reduction_model=None,
+            device=device, 
+            only_embed_annotations=True, 
+            annotations_filename='catart_grid.csv',
+            run_pretrained_classifier=False
+            )
+        bacpipe.generate_embeddings(
+            model_name=model, 
+            audio_dir=audio_dir, 
+            annotations_df=df,
+            dim_reduction_model='umap',
+            device=device, 
+            only_embed_annotations=True, 
+            annotations_filename='catart_grid.csv',
+            run_pretrained_classifier=False
+            )
     
-    bacpipe.play()
-
-    ld = bacpipe.model_specific_embedding_creation(
-        **vars(bacpipe.config), **vars(bacpipe.settings)
-    )
-
-
-    umap_embeddings = {}
-    for model in ld.keys():
-        file_path = list(ld[model].paths.dim_reduc_parent_dir.rglob(f'*{model}'))[0]
+        file_path = list(loader.paths.dim_reduc_parent_dir.rglob(f'*{model}'))[0]
         with open(list(file_path.rglob('*.json'))[0], 'r') as f:
-            umap_embeddings[model] = json.load(f)
-            
-    if len(df) != ld[model].metadata_dict['nr_embeds_total']:
-        ld[model].audio_dir = DATA_DIR
-        make_annotations_for_bacpipe_inputs(ld[model])
+            umaps[model] = json.load(f)
     
-    
-    return umap_embeddings, ld[model]
+    return umaps, audio_dir, loader
 
 
-def make_annotations_for_bacpipe_inputs(loader=False):
+def make_annotations_for_bacpipe_inputs(audio_dir):
     """
     Build an annotations.csv file which can then be used as an input
     for bacpipe. This way all deep learning models create embeddings
@@ -56,68 +55,20 @@ def make_annotations_for_bacpipe_inputs(loader=False):
     input length, the audio is minimum padded to correspond to the
     required model input length. 
     """
-    if not loader:
-        configs = {**vars(bacpipe.config)}
-        configs.pop('dim_reduction_model')
-        loader = bacpipe.generate_embeddings.Loader(
-            model_name = 'birdnet', 
-            check_if_combination_exists=False,
-            dim_reduction_model=None, 
-            **configs, 
-            **vars(bacpipe.settings)
-            )
-        
-        # specify_annotation_grid 
-        lengths = [get_duration(path=f) for f in loader.files]
-        segments_per_file = [
-            # we decided to discard the last segment that is under
-            # CATART_AUDIO_LENGTH seconds long
-            l // CATART_AUDIO_LENGTH + 1
-            for l in lengths
-        ]
-        file_array_same_length_as_starts = []
-        [
-            file_array_same_length_as_starts.extend(
-                [str(file.relative_to(loader.audio_dir))] * int(nr_segs)
-            )
-            for file, nr_segs in zip(
-                loader.files, segments_per_file
-                )
-        ]
-    else:
-        segments_per_file = loader.metadata_dict['files']['nr_embeds_per_file']
-        file_array_same_length_as_starts = []
-        [
-            file_array_same_length_as_starts.extend(
-                [file] * int(nr_segs)
-            )
-            for file, nr_segs in zip(
-                loader.metadata_dict['files']['audio_files'], segments_per_file
-                )
-        ]
-        
-    starts = []
-    [
-        starts.extend(
-            np.arange(nr_segs)
-            *CATART_AUDIO_LENGTH
-            ) 
-        for nr_segs in segments_per_file
-        ]
+    df_ml = bacpipe.metadata_labels(audio_dir, model='birdnet', as_type='dataframe', overwrite=False)
     
-    catart_grid = pd.DataFrame()
-    catart_grid['start'] = starts
-    catart_grid['end'] = catart_grid['start'] + CATART_AUDIO_LENGTH
-    catart_grid['audiofilename'] = file_array_same_length_as_starts
-    catart_grid['label:speices'] = [None] * len(catart_grid)
-    catart_grid.to_csv(Path(loader.audio_dir) / 'annotations.csv')
+    catart_grid = df_ml[['start', 'end', 'audio_file_name']].copy()
+    catart_grid = catart_grid.rename(columns={'audio_file_name': 'audiofilename'})
+    catart_grid['audiofilename'] = [Path(s).relative_to(audio_dir) for s in catart_grid['audiofilename'].values]
+    catart_grid.loc[:, 'label:speices'] = [None] * len(catart_grid)
+    catart_grid.to_csv(Path(audio_dir) / 'catart_grid.csv')
     return catart_grid
 
 def get_umap_2d(data_dir, embeds):
     df = pd.DataFrame()
 
     annotations = pd.read_csv(
-        Path(data_dir) / 'annotations.csv'
+        Path(data_dir) / 'catart_grid.csv'
         )
     annotations, embeds = ensure_common_files(embeds, annotations)
     
